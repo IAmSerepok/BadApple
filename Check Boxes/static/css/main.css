@@ -1,0 +1,136 @@
+body {
+    font-family: 'Arial', sans-serif;
+    background-color: #f5f5f5;
+    margin: 0;
+    padding: 20px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    min-height: 100vh;
+}
+
+#video-container {
+    background-color: white;
+    border-radius: 8px;
+    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+    padding: 25px;
+    width: 100%;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+}
+
+h1 {
+    color: #333;
+    text-align: center;
+    margin-bottom: 20px;
+}
+
+#checkbox-grid-container {
+    width: 100%;
+    display: flex;
+    justify-content: center;
+    margin-bottom: 5px;
+}
+
+#checkbox-grid {
+    background-color: #f9f9f9;
+    border: 1px solid #e0e0e0;
+    border-radius: 6px;
+    padding: 5px;
+    display: inline-block;
+    line-height: 0;
+}
+
+.pixel-checkbox {
+    -webkit-appearance: none;
+    -moz-appearance: none;
+    appearance: none;
+    width: 16px;
+    height: 16px;
+    margin: 1px;
+    border: 2px solid #aaa;
+    border-radius: 3px;
+    background-color: white;
+    cursor: pointer;
+    vertical-align: top;
+    position: relative;
+    transition: all 0.2s ease;
+}
+
+.pixel-checkbox:checked {
+    background-color: #414141;
+    border-color: #666;
+}
+
+.pixel-checkbox:checked::after {
+    content: "✓";
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    color: #ffffff;
+    font-size: 12px;
+    font-weight: bold;
+}
+
+.pixel-checkbox:hover {
+    border-color: #888;
+    box-shadow: 0 0 3px rgba(0, 0, 0, 0.2);
+}
+
+#controls {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    gap: 15px;
+    margin-top: 20px;
+}
+
+button {
+    padding: 8px 20px;
+    font-size: 14px;
+    background-color: #5c6bc0;
+    color: white;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+button:hover {
+    background-color: #3f51b5;
+}
+
+#frameCounter {
+    font-size: 14px;
+    font-weight: bold;
+    color: #555;
+    background-color: #f0f0f0;
+    padding: 6px 12px;
+    border-radius: 4px;
+}
+
+@media (max-width: 800px) {
+    .pixel-checkbox {
+        width: 14px;
+        height: 14px;
+        margin: 1px;
+    }
+    
+    .pixel-checkbox:checked::after {
+        font-size: 10px;
+    }
+}
+
+@media (max-width: 600px) {
+    .pixel-checkbox {
+        width: 12px;
+        height: 12px;
+        border-width: 1px;
+    }
+    
+    #checkbox-grid {
+        padding: 10px;
+    }
+}
