@@ -1,10 +1,10 @@
 import os
 
 from PIL import Image
-from typing import Dict
+from typing import Tuple
 
 
-def crop_images(input_dir: str, output_dir: str, rect: Dict[int, int, int, int]) -> None:
+def crop_images(input_dir: str, output_dir: str, rect: Tuple[int, int, int, int]) -> None:
     """
     Обрезает все изображения в указанной директории по заданному прямоугольнику и сохраняет в новую директорию.
 
@@ -14,7 +14,7 @@ def crop_images(input_dir: str, output_dir: str, rect: Dict[int, int, int, int])
     Args:
         input_dir (str): Путь к директории с исходными изображениями.
         output_dir (str): Путь к директории для сохранения результатов (будет создана, если не существует).
-        rect (Dict[int, int, int, int]): Координаты области обрезки в формате (left, upper, right, lower).
+        rect (Tuple[int, int, int, int]): Координаты области обрезки в формате (left, upper, right, lower).
 
     Raises:
         ValueError: Если координаты rect некорректны (left >= right или upper >= lower).
