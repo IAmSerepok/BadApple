@@ -3,6 +3,11 @@ import random
 import os
 from pathlib import Path
 from concurrent.futures import ThreadPoolExecutor, as_completed
+from wonderwords import RandomWord
+
+
+_rw = RandomWord()
+DIGITS = "0123456789"
 
 
 def _load_font(font_path, size):
@@ -25,18 +30,66 @@ def _prepare_mask(mask_path, total_cols, total_rows, threshold, invert):
     if invert:
         mask = Image.eval(mask, lambda p: 255 - p)
     mask_bin = mask.point(lambda p: 255 if p < threshold else 0)
-    return mask_bin.load()
+
+    return mask_bin, mask_bin.load()
+
+
+def _random_word(length):
+    if length <= 0:
+        return None
+    try:
+        return _rw.word(word_min_length=length, word_max_length=length)
+    except Exception:
+        return None
+
+
+def _digits(length):
+    return "".join(random.choice(DIGITS) for _ in range(length))
+
+
+def _word_or_fallback(L, uppercase=True, split_long_runs=True, max_word_len=12):
+    if L <= 0:
+        return ""
+    if not split_long_runs or L <= max_word_len:
+        w = _random_word(L)
+        return (w.upper() if uppercase else w.lower()) if w else _digits(L)
+    parts = []
+    rem = L
+    while rem > 0:
+        chunk = min(rem, max_word_len)
+        w = _random_word(chunk)
+        parts.append((w.upper() if uppercase else w.lower()) if w else _digits(chunk))
+        rem -= chunk
+    return "".join(parts)
+
+
+def _segments_in_block(is_black, bi, bj, cols, cj):
+    segs = []
+    ci = 0
+    while ci < cols:
+        if not is_black(bi, bj, ci, cj):
+            ci += 1
+            continue
+        s = ci
+        while ci < cols and is_black(bi, bj, ci, cj):
+            ci += 1
+        segs.append((s, ci))
+    return segs
 
 
 def render_one(
-    background_img, 
-    mask_mp, 
+    background_img,
+    mask_mp,
     cols, rows,
     x0, y0, w, h, dx, dy,
     step_x, step_y,
     n_blocks_x, n_blocks_y,
-    font, alphabet, jitter, text_color,
+    font, jitter, text_color,
     output_path,
+    use_words=True,
+    uppercase=True,
+    split_long_runs=True,
+    max_word_len=12,
 ):
     img = background_img.copy()
     draw = ImageDraw.Draw(img)
@@ -48,21 +101,27 @@ def render_one(
     for bj in range(n_blocks_y):
         for bi in range(n_blocks_x):
             for cj in range(rows):
-                for ci in range(cols):
-                    if not is_black(bi, bj, ci, cj):
-                        continue
-                    total += 1
-                    cell_x = x0 + bi * step_x + ci * (w + dx)
-                    cell_y = y0 + bj * step_y + cj * (h + dy)
+                for (s, e) in _segments_in_block(is_black, bi, bj, cols, cj):
+                    L = e - s
+                    chars = _word_or_fallback(
+                        L, uppercase=uppercase,
+                        split_long_runs=split_long_runs,
+                        max_word_len=max_word_len,
+                    ) if use_words else _digits(L)
 
-                    char = random.choice(alphabet)
-                    bbox = draw.textbbox((0, 0), char, font=font)
-                    tw = bbox[2] - bbox[0]
-                    th = bbox[3] - bbox[1]
-                    pos_x = cell_x + (w - tw) / 2 - bbox[0] + random.randint(-jitter, jitter)
-                    pos_y = cell_y + (h - th) / 2 - bbox[1] + random.randint(-jitter, jitter)
+                    for i, ch in enumerate(chars):
+                        ci = s + i
+                        total += 1
+                        cell_x = x0 + bi * step_x + ci * (w + dx)
+                        cell_y = y0 + bj * step_y + cj * (h + dy)
 
-                    draw.text((pos_x, pos_y), char, font=font, fill=text_color)
+                        bbox = draw.textbbox((0, 0), ch, font=font)
+                        tw = bbox[2] - bbox[0]
+                        th = bbox[3] - bbox[1]
+                        pos_x = cell_x + (w - tw) / 2 - bbox[0] + random.randint(-jitter, jitter)
+                        pos_y = cell_y + (h - th) / 2 - bbox[1] + random.randint(-jitter, jitter)
+
+                        draw.text((pos_x, pos_y), ch, font=font, fill=text_color)
 
     img.convert("RGB").save(output_path, quality=95)
     return output_path, total
@@ -80,12 +139,16 @@ def process_folder(
     n_blocks_x=1, n_blocks_y=1,
     threshold=128,
     invert=False,
-    alphabet="АБВГДЕЁЖЗИЙКЛМНОПРСТУФХЦЧШЩЪЫЬЭЮЯ",
     font_size=None,
     jitter=1,
     text_color=(0, 0, 0, 255),
     max_workers=None,
     extensions=(".jpg", ".jpeg", ".png", ".bmp"),
+    use_words=True,
+    uppercase=True,
+    split_long_runs=True,
+    max_word_len=12,
+    seed=None,
 ):
     frames_dir = Path(frames_dir)
     output_dir = Path(output_dir)
@@ -110,12 +173,15 @@ def process_folder(
         print(f"[warn] в {frames_dir} нет картинок")
         return []
 
-    print(f"Найдено {len(files)} кадров, запускаю параллельно…")
-
     def worker(path: Path):
-        mp = _prepare_mask(path, total_cols, total_rows, threshold, invert)
+        local_rng = random.Random()
+        if seed is not None:
+            local_rng.seed(f"{seed}:{path.name}")
+
+        mask_bin, mp = _prepare_mask(path, total_cols, total_rows, threshold, invert)
         out_name = f"output_{path.stem}.jpg"
         out_path = output_dir / out_name
+
         return render_one(
             background_img=bg,
             mask_mp=mp,
@@ -123,9 +189,13 @@ def process_folder(
             x0=x0, y0=y0, w=w, h=h, dx=dx, dy=dy,
             step_x=step_x, step_y=step_y,
             n_blocks_x=n_blocks_x, n_blocks_y=n_blocks_y,
-            font=font, alphabet=alphabet,
+            font=font,
             jitter=jitter, text_color=text_color,
             output_path=str(out_path),
+            use_words=use_words,
+            uppercase=uppercase,
+            split_long_runs=split_long_runs,
+            max_word_len=max_word_len,
         )
 
     results = []
@@ -145,8 +215,6 @@ def process_folder(
 
 
 if __name__ == "__main__":
-    random.seed(42)
-
     process_folder(
         frames_dir="frames",
         output_dir="output",
@@ -162,5 +230,7 @@ if __name__ == "__main__":
         invert=False,
         jitter=0,
         font_size=28,
-        max_workers=None
+        max_workers=None,
+        use_words=True,
+        seed=42
     )
